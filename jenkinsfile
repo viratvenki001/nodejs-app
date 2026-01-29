@@ -1,0 +1,80 @@
+pipeline {
+    agent any
+
+    environment{
+        ECR_REPO = '471112519850.dkr.ecr.ap-south-1.amazonaws.com/nodejs-app'
+        IMAGE_TAG = 'latest'
+    }
+
+    stages {
+        
+        stage('Cleanup Workspace') {
+          steps {
+              sh 'rm -rf node_modules'
+          }
+        }
+
+        stage('Checkout') {
+            steps {
+                git 'https://github.com/viratvenki001/nodejs-app.git'
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh '''
+                  node -v
+                  npm -v
+                  npm ci --prefer-offline
+                '''
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def scanner = tool 'sonar-scanner'
+                    withSonarQubeEnv('sonar') {
+                        sh """
+                        ${scanner}/bin/sonar-scanner \
+                        -Dsonar.projectKey=nodejs-app \
+                        -Dsonar.sources=. \
+                        -Dsonar.exclusions=node_modules/**
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('ECR Login') {
+            steps {
+                sh '''
+                  aws ecr get-login-password --region ap-south-1 | \
+                  docker login --username AWS --password-stdin 471112519850.dkr.ecr.ap-south-1.amazonaws.com
+                '''
+            }
+        }
+
+        stage('Docker Build & Push') {
+            steps {
+                sh '''
+                  docker build -t $ECR_REPO:$IMAGE_TAG .
+                  docker push $ECR_REPO:$IMAGE_TAG 
+                '''
+            }
+        }
+
+        stage('Deploy to EC2') {
+          steps {
+              sh '''
+              ssh -o StrictHostKeyChecking=no ubuntu@54.234.98.125 
+              docker rm -f nodejs-app || true
+              docker login --username AWS --password $(aws ecr get-login-password --region ap-south-1) 471112519850.dkr.ecr.ap-south-1.amazonaws.com
+              docker pull 471112519850.dkr.ecr.ap-south-1.amazonaws.com/nodejs-app:latest
+              docker run -d -p 80:8080 --name nodejs-app 471112519850.dkr.ecr.ap-south-1.amazonaws.com/nodejs-app:latest
+              '''
+          }
+        }
+
+   }
+}
