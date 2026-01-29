@@ -5,7 +5,7 @@ app.get('/', (req, res) => {
   res.send('Hello from End-to-End DevOps Project 🚀');
 });
 
-app.listen(3000, () => {
+app.listen(8080, () => {
   console.log('Server running on port 8080');
 });
 
