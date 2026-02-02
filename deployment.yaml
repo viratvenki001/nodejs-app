@@ -12,7 +12,9 @@ spec:
       labels:
         app: nodejs
     spec:
-      containers:
+      imagePullSecrets:
+      - name: ecr-secret
+        containers:
       - name: nodejs-container
         image: 471112519850.dkr.ecr.ap-south-1.amazonaws.com/nodejs-app:latest
         ports:
